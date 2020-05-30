@@ -129,7 +129,6 @@ def fetch_schemas():
     schema_org_exports = {}
 
     additional_datasets = get_all_datasets_from_dataverses()
-    additional_datasets = []
     additional_data_for_gid = {d.get('global_id'): d for d in additional_datasets}
     #additional_global_ids = set()
     #ds = len([i for i in additional_datasets if i['type'] == 'dataset'])
@@ -140,7 +139,7 @@ def fetch_schemas():
     # set-wise union, remove "" if it's in there
     total_datasets = {
             **data_for_gid,
-            **additional_data_for_gd
+            **additional_data_for_gid
     }
     total_datasets.pop('')
 
