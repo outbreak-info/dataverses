@@ -118,7 +118,19 @@ def scrape_schema_representation(url):
         return parser.schema
     return False
 
-def fetch_schemas():
+def fetch_datasets(use_cached=False):
+    """
+    grabs all datasets and files related to QUERIES both by querying
+    and by grabbing everything in related dataverses
+    extracts their global_id, which in this case is a DOI
+    returns a dictionary mapping global_id -> dataset
+    """
+
+    if use_cached:
+        with open('cache/datasets.json') as cached_ds:
+            datasets = json.load(cached_ds)
+        return datasets
+
     dataset_endpoint = compile_query(DATAVERSE_SERVER, QUERIES, response_types=["dataset", "file"])
     datasets = compile_paginated_data(dataset_endpoint)
 
@@ -137,19 +149,22 @@ def fetch_schemas():
     except KeyError:
         pass
 
-    for gid, dataset in total_datasets.items():
-        schema_export_url = f"{EXPORT_URL}&persistentId={gid}"
-        print(f"getting schema {schema_export_url}")
-        req = requests.get(schema_export_url)
-        res = req.json()
-        if res.get('status') and res.get('status') == 'ERROR':
-            schema = scrape_schema_representation(dataset.get('url'))
-            if schema:
-                schema_org_exports[gid] = schema
-                print(f"{dataset['global_id']}: got schema")
-        else:
-            schema_org_exports[gid] = res
-    return schema_org_exports
+    return total_datasets
+
+
+def get_schema(gid, backup_url):
+    schema_export_url = f"{EXPORT_URL}&persistentId={gid}"
+    print(f"getting schema {schema_export_url}")
+    req = requests.get(schema_export_url)
+    res = req.json()
+    if res.get('status') and res.get('status') == 'ERROR':
+        schema = scrape_schema_representation(backup_url)
+        if schema:
+            return schema
+            print(f"{gid}: got schema")
+    else:
+        # success, response is the schema
+        return res
 
 def transform_schema(s, gid):
     """
@@ -191,7 +206,7 @@ def transform_schema(s, gid):
         "description":   s['description'][0],
         "identifier":    s["@id"], # ?
         "dateModified":  s['dateModified'],
-        "datePublished": s['datePublished'],
+        "datePublished": s.get('datePublished'),
         "keywords":      s['keywords'],
         "license":       s['license'].get('url'),
         "distribution":  s.get("distribution"),
@@ -199,22 +214,17 @@ def transform_schema(s, gid):
 
     return resource
 
+def get_parsed_data():
+    datasets = fetch_datasets(use_cached=True)
+    for gid, dataset in datasets.items():
+        print('.')
+        #schema = get_schema(gid, dataset.get('url'))
+        schema = dataset
+        transformed = transform_schema(schema, gid)
+        yield transformed
 
 if __name__ == "__main__":
-    #schemas = fetch_schemas()
-    #with open('d.json', 'w') as of:
-    #    json.dump(schemas, of)
+    coerced_data = [i for i in get_parsed_data()]
 
-    with open('d.json', 'r') as f:
-        schemas = json.load(f)
-
-    coerced_data = []
-    #obp = OutbreakParser()
-    for gid, schema in schemas.items():
-        transformed = transform_schema(schema, gid)
-        #obp.validate(transformed)
-        coerced_data.append(transformed)
-
-    #print(coerced_data)
-    with open('outpt.txt', 'w') as of:
+    with open('output.txt', 'w') as of:
         json.dump(coerced_data, of)
