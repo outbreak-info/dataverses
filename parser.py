@@ -2,6 +2,7 @@ import requests
 import json
 from datetime    import date
 from html.parser import HTMLParser
+from Parsers import OutbreakParser
 
 QUERIES = ["2019-nCoV", "COVID-19", "COVID-19 virus", "COVID19", "COVID19 virus", "HCoV-19", "HCoV19", "Human coronavirus 19", "Human coronavirus 2019", "SARS-2", "SARS-CoV-2", "SARS-CoV2", "SARS2", "SARSCoV-2", "SARSCoV2",
                  "Severe acute respiratory syndrome coronavirus 2", "Wuhan coronavirus", "Wuhan seafood market pneumonia virus", "coronavirus disease", "coronavirus disease 19", "coronavirus disease 2019", "novel coronavirus", "novel coronavirus 2019"]
@@ -47,7 +48,7 @@ def compile_paginated_data(query_endpoint, per_page=100):
 
     while continue_paging:
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
-        #print(f"getting {url}")
+        print(f"getting {url}")
         req = requests.get(url)
         response = req.json()
         total = response.get('data').get('total_count')
@@ -121,30 +122,24 @@ def fetch_schemas():
     dataset_endpoint = compile_query(DATAVERSE_SERVER, QUERIES, response_types=["dataset", "file"])
     datasets = compile_paginated_data(dataset_endpoint)
 
-    #ds = len([i for i in datasets if i['type'] == 'dataset'])
-    #fs = len([i for i in datasets if i['type'] == 'file'])
-    #print(f"ds, fs: {ds} {fs}")
-
     data_for_gid = {d.get('global_id'): d for d in datasets}
     schema_org_exports = {}
 
     additional_datasets = get_all_datasets_from_dataverses()
     additional_data_for_gid = {d.get('global_id'): d for d in additional_datasets}
-    #additional_global_ids = set()
-    #ds = len([i for i in additional_datasets if i['type'] == 'dataset'])
-    #fs = len([i for i in additional_datasets if i['type'] == 'file'])
-    #print(f"add'l ds, fs: {ds} {fs}")
 
-
-    # set-wise union, remove "" if it's in there
     total_datasets = {
             **data_for_gid,
             **additional_data_for_gid
     }
-    total_datasets.pop('')
+    try:
+        total_datasets.pop('')
+    except KeyError:
+        pass
 
     for gid, dataset in total_datasets.items():
         schema_export_url = f"{EXPORT_URL}&persistentId={gid}"
+        print(f"getting schema {schema_export_url}")
         req = requests.get(schema_export_url)
         res = req.json()
         if res.get('status') and res.get('status') == 'ERROR':
@@ -175,22 +170,23 @@ def transform_schema(s, gid):
             "curationDate": today,
     }
     authors = []
-    for author in s['author']:
-        a = {"@type": "Person",
-             "name": author['name']
+    for author_obj in s['author']:
+        author = {
+             "@type": "Person",
+             "name": author_obj['name']
              }
-        if author.get('affiliation'):
-            a['affiliation'] = {
+        if author_obj.get('affiliation'):
+            author['affiliation'] = {
                  "@type": "Organization",
-                  "name": author.get('affiliation')
+                  "name": author_obj.get('affiliation')
                   }
-        authors.append(a)
+        authors.append(author)
 
     resource = {
         "_id": _id,
         "doi": doi,
         "curatedBy": curatedBy,
-        "author": a,
+        "author": authors,
         "name":          s['name'],
         "description":   s['description'][0],
         "identifier":    s["@id"], # ?
@@ -198,16 +194,27 @@ def transform_schema(s, gid):
         "datePublished": s['datePublished'],
         "keywords":      s['keywords'],
         "license":       s['license'].get('url'),
-        "distribution":  s["distribution"],
+        "distribution":  s.get("distribution"),
     }
 
     return resource
 
 
 if __name__ == "__main__":
-    schemas = fetch_schemas()
-    coerced_data = []
-    for gid, schema in schemas.items():
-        coerced_data.append(transform_schema(schema, gid))
+    #schemas = fetch_schemas()
+    #with open('d.json', 'w') as of:
+    #    json.dump(schemas, of)
 
-    print(coerced_data)
+    with open('d.json', 'r') as f:
+        schemas = json.load(f)
+
+    coerced_data = []
+    #obp = OutbreakParser()
+    for gid, schema in schemas.items():
+        transformed = transform_schema(schema, gid)
+        #obp.validate(transformed)
+        coerced_data.append(transformed)
+
+    #print(coerced_data)
+    with open('outpt.txt', 'w') as of:
+        json.dump(coerced_data, of)
