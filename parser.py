@@ -215,11 +215,14 @@ def transform_schema(s, gid):
     return resource
 
 def get_parsed_data():
-    datasets = fetch_datasets(use_cached=True)
+    use_cached = True
+    datasets = fetch_datasets(use_cached=use_cached)
     for gid, dataset in datasets.items():
-        print('.')
-        #schema = get_schema(gid, dataset.get('url'))
-        schema = dataset
+        if use_cached:
+            schema = dataset
+        else:
+            schema = get_schema(gid, dataset.get('url'))
+
         transformed = transform_schema(schema, gid)
         yield transformed
 
