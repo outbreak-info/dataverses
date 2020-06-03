@@ -1,8 +1,11 @@
 import requests
 import json
+
 from datetime    import date
 from html.parser import HTMLParser
-from Parsers import OutbreakParser
+
+from biothings import config
+logging = config.logger
 
 QUERIES = ["2019-nCoV", "COVID-19", "COVID-19 virus", "COVID19", "COVID19 virus", "HCoV-19", "HCoV19", "Human coronavirus 19", "Human coronavirus 2019", "SARS-2", "SARS-CoV-2", "SARS-CoV2", "SARS2", "SARSCoV-2", "SARSCoV2",
                  "Severe acute respiratory syndrome coronavirus 2", "Wuhan coronavirus", "Wuhan seafood market pneumonia virus", "coronavirus disease", "coronavirus disease 19", "coronavirus disease 2019", "novel coronavirus", "novel coronavirus 2019"]
@@ -48,7 +51,7 @@ def compile_paginated_data(query_endpoint, per_page=100):
 
     while continue_paging:
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
-        print(f"getting {url}")
+        logging.warning(f"getting {url}")
         req = requests.get(url)
         response = req.json()
         total = response.get('data').get('total_count')
@@ -83,7 +86,10 @@ def find_within_dataverse(dataverse_id, query):
     return datasets_and_files
 
 def get_all_datasets_from_dataverses():
+    logging.info("finding all dataverses that match for queries")
     dataverses = find_relevant_dataverses(QUERIES)
+
+    logging.info("grabbing datasets from each matched dataverse")
     datasets = []
     for dataverse in dataverses:
         datasets.extend(find_within_dataverse(dataverse, query=None))
@@ -96,6 +102,7 @@ def scrape_schema_representation(url):
     this will grab it from the url
     by looking for <script type="application/ld+json">
     """
+    logging.warning(f"scraping schema.org representation from the dataset url {url}")
     class SchemaScraper(HTMLParser):
         def __init__(self):
             super().__init__()
@@ -131,6 +138,7 @@ def fetch_datasets(use_cached=False):
             datasets = json.load(cached_ds)
         return datasets
 
+    logging.info("getting all datasets that match queries")
     dataset_endpoint = compile_query(DATAVERSE_SERVER, QUERIES, response_types=["dataset", "file"])
     datasets = compile_paginated_data(dataset_endpoint)
 
@@ -154,14 +162,14 @@ def fetch_datasets(use_cached=False):
 
 def get_schema(gid, backup_url):
     schema_export_url = f"{EXPORT_URL}&persistentId={gid}"
-    print(f"getting schema {schema_export_url}")
+    logging.info(f"getting schema {schema_export_url}")
     req = requests.get(schema_export_url)
     res = req.json()
     if res.get('status') and res.get('status') == 'ERROR':
+        logging.warning("schema export failed, scraping instead")
         schema = scrape_schema_representation(backup_url)
         if schema:
             return schema
-            print(f"{gid}: got schema")
     else:
         # success, response is the schema
         return res
