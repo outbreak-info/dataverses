@@ -4,8 +4,12 @@ import json
 from datetime    import date
 from html.parser import HTMLParser
 
-from biothings import config
-logging = config.logger
+try:
+    from biothings import config
+    logging = config.logger
+except ImportError:
+    import logging
+    logging.basicConfig(filename="dataverselog.log", level=logging.INFO)
 
 QUERIES = ["2019-nCoV", "COVID-19", "COVID-19 virus", "COVID19", "COVID19 virus", "HCoV-19", "HCoV19", "Human coronavirus 19", "Human coronavirus 2019", "SARS-2", "SARS-CoV-2", "SARS-CoV2", "SARS2", "SARSCoV-2", "SARSCoV2",
                  "Severe acute respiratory syndrome coronavirus 2", "Wuhan coronavirus", "Wuhan seafood market pneumonia virus", "coronavirus disease", "coronavirus disease 19", "coronavirus disease 2019", "novel coronavirus", "novel coronavirus 2019"]
@@ -53,6 +57,9 @@ def compile_paginated_data(query_endpoint, per_page=100):
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
         logging.warning(f"getting {url}")
         req = requests.get(url)
+        if req.status_code != '200':
+            logging.error(f"failed to get {url}")
+            continue
         response = req.json()
         total = response.get('data').get('total_count')
         data.extend(response.get('data').get('items'))
@@ -119,6 +126,8 @@ def scrape_schema_representation(url):
                 self.readingSchema = False
 
     req    = requests.get(url)
+    if req.status_code != '200':
+        logging.error(f"failed to get {url}")
     parser = SchemaScraper()
     parser.feed(req.text)
     if parser.schema:
@@ -134,7 +143,7 @@ def fetch_datasets(use_cached=False):
     """
 
     if use_cached:
-        with open('cache/datasets.json') as cached_ds:
+        with open('cache/pre_transform.json') as cached_ds:
             datasets = json.load(cached_ds)
         return datasets
 
@@ -152,6 +161,7 @@ def fetch_datasets(use_cached=False):
             **data_for_gid,
             **additional_data_for_gid
     }
+
     try:
         total_datasets.pop('')
     except KeyError:
@@ -199,43 +209,40 @@ def transform_schema(s, gid):
              "name": author_obj['name']
              }
         if author_obj.get('affiliation'):
-            author['affiliation'] = {
+            author['affiliation'] = [{
                  "@type": "Organization",
                   "name": author_obj.get('affiliation')
-                  }
+                  }]
         authors.append(author)
 
+    pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'creator', 'version', '@type']
     resource = {
+        "@type": "Dataset",
         "_id": _id,
         "doi": doi,
         "curatedBy": curatedBy,
         "author": authors,
-        "name":          s['name'],
         "description":   s['description'][0],
         "identifier":    s["@id"], # ?
-        "dateModified":  s['dateModified'],
-        "datePublished": s.get('datePublished'),
-        "keywords":      s['keywords'],
         "license":       s['license'].get('url'),
-        "distribution":  s.get("distribution"),
     }
+    for field in pass_through_fields:
+        resource = add_field(resource, s, field)
 
     return resource
 
+def add_field(resource, origin, field_name):
+    field = origin.get(field_name)
+    if field:
+        resource[field_name] = field
+    return resource
+
 def get_parsed_data():
-    use_cached = True
-    datasets = fetch_datasets(use_cached=use_cached)
+    datasets = fetch_datasets(use_cached=True)
     for gid, dataset in datasets.items():
-        if use_cached:
-            schema = dataset
-        else:
-            schema = get_schema(gid, dataset.get('url'))
+        schema = get_schema(gid, dataset.get('url'))
+        if not schema:
+            continue
 
         transformed = transform_schema(schema, gid)
         yield transformed
-
-if __name__ == "__main__":
-    coerced_data = [i for i in get_parsed_data()]
-
-    with open('output.txt', 'w') as of:
-        json.dump(coerced_data, of)

@@ -1,5 +1,8 @@
 import biothings.hub.dataload.uploader
 
+MAP_URL = "https://raw.githubusercontent.com/SuLab/outbreak.info-resources/master/outbreak_resources_es_mapping.json"
+MAP_VARS = ["@type", "author", "curatedBy", "dateModified", "datePublished", "description", "distribution", "doi", "keywords", "@id", "funder", "identifier", "creator", "version", "@type", "license", "name"]
+
 try:
     from dataverses.parser import get_parsed_data as parser_func
 except ImportError:
@@ -8,19 +11,20 @@ except ImportError:
 class DataverseUploader(biothings.hub.dataload.uploader.BaseSourceUploader):
     name = "dataverse"
     __metadata__ = {
-            "src_meta": {
-                "author": {
-                    "name": "Julia Mullen",
-                    "url":  "https://github.com/juliamullen"
-                    },
-                "code": {
-                    "branch": "master",
-                    "repo": "https://github.com/juliamullen/dataverses"
-                    },
-                "url": "https://dataverse.org/",
-                "license": "https://dataverse.org/best-practices/harvard-dataverse-general-terms-use",
-                }
-            }
+        "src_meta": {
+            "author": {
+                "name": "Julia Mullen",
+                "url":  "https://github.com/juliamullen"
+                },
+            "code": {
+                "branch": "master",
+                "repo": "https://github.com/juliamullen/dataverses"
+                },
+            "url": "https://dataverse.org/",
+            "license": "https://dataverse.org/best-practices/harvard-dataverse-general-terms-use",
+        }
+    }
+
     idconverter = None
     main_source = "dataverse"
     storage_class = biothings.hub.dataload.storage.BasicStorage
