@@ -9,13 +9,13 @@ MAP_URL = "https://raw.githubusercontent.com/SuLab/outbreak.info-resources/maste
 MAP_VARS = ["@type", "author", "curatedBy", "dateModified", "datePublished", "description", "distribution", "doi", "keywords", "@id", "funder", "identifier", "creator", "version", "@type", "license", "name"]
 
 try:
-    from dataverse.parser import load_annotations as parser_func
+    from dataverses.parser import load_annotations as parser_func
 except ImportError:
     from .parser import load_annotations as parser_func
 
 class DataverseUploader(biothings.hub.dataload.uploader.BaseSourceUploader):
-    main_source = "dataverse"
-    name = "dataverse"
+    main_source = "dataverses"
+    name = "dataverses"
 
     __metadata__ = {
         "src_meta": {
