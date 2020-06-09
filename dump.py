@@ -9,4 +9,19 @@ class DataverseDumper(biothings.hub.dataload.dumper.DummyDumper):
     SRC_NAME = "dataverses"
     SRC_ROOT_FOLDER = os.path.join(config.DATA_ARCHIVE_ROOT, SRC_NAME)
 
+    __metadata__ = {
+        "src_meta": {
+            "author": {
+                "name": "Julia Mullen",
+                "url":  "https://github.com/juliamullen"
+                },
+            "code": {
+                "branch": "master",
+                "repo": "https://github.com/juliamullen/dataverses"
+                },
+            "url": "https://dataverse.org/",
+            "license": "https://dataverse.org/best-practices/harvard-dataverse-general-terms-use",
+        }
+    }
+
     SCHEDULE = None

@@ -1,15 +1,22 @@
 import biothings.hub.dataload.uploader
+import biothings
+import config
+import requests
+
+biothings.config_for_app(config)
 
 MAP_URL = "https://raw.githubusercontent.com/SuLab/outbreak.info-resources/master/outbreak_resources_es_mapping.json"
 MAP_VARS = ["@type", "author", "curatedBy", "dateModified", "datePublished", "description", "distribution", "doi", "keywords", "@id", "funder", "identifier", "creator", "version", "@type", "license", "name"]
 
 try:
-    from dataverses.parser import get_parsed_data as parser_func
+    from dataverse.parser import load_annotations as parser_func
 except ImportError:
-    from .parser import get_parsed_data as parser_func
+    from .parser import load_annotations as parser_func
 
 class DataverseUploader(biothings.hub.dataload.uploader.BaseSourceUploader):
+    main_source = "dataverse"
     name = "dataverse"
+
     __metadata__ = {
         "src_meta": {
             "author": {
@@ -26,7 +33,6 @@ class DataverseUploader(biothings.hub.dataload.uploader.BaseSourceUploader):
     }
 
     idconverter = None
-    main_source = "dataverse"
     storage_class = biothings.hub.dataload.storage.BasicStorage
 
     def load_data(self, data_folder):

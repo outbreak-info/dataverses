@@ -237,7 +237,7 @@ def add_field(resource, origin, field_name):
         resource[field_name] = field
     return resource
 
-def get_parsed_data():
+def load_annotations():
     datasets = fetch_datasets(use_cached=True)
     for gid, dataset in datasets.items():
         schema = get_schema(gid, dataset.get('url'))
