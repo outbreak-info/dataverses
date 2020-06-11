@@ -1,2 +1,2 @@
 from .upload import DataverseUploader
-from .dumper import DataverseDumper
+from .dump import DataverseDumper
