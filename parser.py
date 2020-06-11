@@ -55,12 +55,12 @@ def compile_paginated_data(query_endpoint, per_page=100):
 
     while continue_paging:
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
-        logging.warning(f"getting {url}")
+        logging.info(f"getting {url}")
         req = requests.get(url)
-        if req.status_code != '200':
-            logging.error(f"failed to get {url}")
-            continue
-        response = req.json()
+        try:
+            response = req.json()
+        except ValueError:
+            logging.error(f"Failed to get a JSON response from {url}")
         total = response.get('data').get('total_count')
         data.extend(response.get('data').get('items'))
         start += per_page
@@ -125,9 +125,10 @@ def scrape_schema_representation(url):
                 self.schema = data
                 self.readingSchema = False
 
-    req    = requests.get(url)
-    if req.status_code != '200':
+    req = requests.get(url)
+    if not req.ok:
         logging.error(f"failed to get {url}")
+        return False
     parser = SchemaScraper()
     parser.feed(req.text)
     if parser.schema:
@@ -241,3 +242,7 @@ def load_annotations():
 
         transformed = transform_schema(schema, gid)
         yield transformed
+
+if __name__ == "__main__":
+    with open('transformed.json', 'w') as output:
+        json.dump([i for i in load_annotations()], output)
