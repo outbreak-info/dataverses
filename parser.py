@@ -134,18 +134,13 @@ def scrape_schema_representation(url):
         return parser.schema
     return False
 
-def fetch_datasets(use_cached=False):
+def fetch_datasets():
     """
     grabs all datasets and files related to QUERIES both by querying
     and by grabbing everything in related dataverses
     extracts their global_id, which in this case is a DOI
     returns a dictionary mapping global_id -> dataset
     """
-
-    if use_cached:
-        with open('cache/pre_transform.json') as cached_ds:
-            datasets = json.load(cached_ds)
-        return datasets
 
     logging.info("getting all datasets that match queries")
     dataset_endpoint = compile_query(DATAVERSE_SERVER, QUERIES, response_types=["dataset", "file"])
@@ -238,7 +233,7 @@ def add_field(resource, origin, field_name):
     return resource
 
 def load_annotations():
-    datasets = fetch_datasets(use_cached=True)
+    datasets = fetch_datasets()
     for gid, dataset in datasets.items():
         schema = get_schema(gid, dataset.get('url'))
         if not schema:
