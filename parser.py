@@ -200,8 +200,10 @@ def transform_schema(s, gid):
     }
     authors = [personify(author) for author in s['author']]
     creator = [personify(creator) for creator in s['creator']]
+    license = s['license'].get('url')
 
     pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'version', '@type']
+
     resource = {
         "@type": "Dataset",
         "_id": _id,
@@ -211,8 +213,11 @@ def transform_schema(s, gid):
         "creator": creator,
         "description":   s['description'][0],
         "identifier":    s["@id"], # ?
-        "license":       s['license'].get('url'),
     }
+
+    if license:
+        resource['license'] = license
+
     for field in pass_through_fields:
         resource = add_field(resource, s, field)
 
@@ -226,7 +231,7 @@ def personify(person_obj):
     if person_obj.get('affiliation'):
         personified['affiliation'] = [{
              "@type": "Organization",
-              "name": person_obj.get('affiliation')
+              "name": person_obj['affiliation']
               }]
     return personified
 
@@ -243,10 +248,9 @@ def load_annotations():
         if not schema:
             continue
 
-        #transformed = transform_schema(schema, gid)
-        #yield transformed
-        yield schema
+        transformed = transform_schema(schema, gid)
+        yield transformed
 
 if __name__ == "__main__":
-    with open('pre_transformed.json', 'w') as output:
+    with open('transformed.json', 'w') as output:
         json.dump([i for i in load_annotations()], output)
