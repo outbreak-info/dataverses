@@ -6,7 +6,7 @@ import requests
 biothings.config_for_app(config)
 
 MAP_URL = "https://raw.githubusercontent.com/SuLab/outbreak.info-resources/master/outbreak_resources_es_mapping.json"
-MAP_VARS = ["@type", "author", "curatedBy", "dateModified", "datePublished", "description", "distribution", "doi", "keywords", "@id", "funder", "identifier", "creator", "version", "license", "name"]
+MAP_VARS = ["@type", "author", "curatedBy", "dateModified", "datePublished", "description", "distribution", "doi", "keywords", "@id", "funding", "identifier", "creator", "version", "license", "name"]
 
 try:
     from dataverses.parser import load_annotations as parser_func
