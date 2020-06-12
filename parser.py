@@ -198,26 +198,17 @@ def transform_schema(s, gid):
             "url":   s['@id'],
             "curationDate": today,
     }
-    authors = []
-    for author_obj in s['author']:
-        author = {
-             "@type": "Person",
-             "name": author_obj['name']
-             }
-        if author_obj.get('affiliation'):
-            author['affiliation'] = [{
-                 "@type": "Organization",
-                  "name": author_obj.get('affiliation')
-                  }]
-        authors.append(author)
+    authors = [personify(author) for author in s['author']]
+    creator = [personify(creator) for creator in s['creator']]
 
-    pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'creator', 'version', '@type']
+    pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'version', '@type']
     resource = {
         "@type": "Dataset",
         "_id": _id,
         "doi": doi,
         "curatedBy": curatedBy,
         "author": authors,
+        "creator": creator,
         "description":   s['description'][0],
         "identifier":    s["@id"], # ?
         "license":       s['license'].get('url'),
@@ -226,6 +217,18 @@ def transform_schema(s, gid):
         resource = add_field(resource, s, field)
 
     return resource
+
+def personify(person_obj):
+    personified = {
+         "@type": "Person",
+         "name": person_obj['name']
+    }
+    if person_obj.get('affiliation'):
+        personified['affiliation'] = [{
+             "@type": "Organization",
+              "name": person_obj.get('affiliation')
+              }]
+    return personified
 
 def add_field(resource, origin, field_name):
     field = origin.get(field_name)
@@ -240,9 +243,10 @@ def load_annotations():
         if not schema:
             continue
 
-        transformed = transform_schema(schema, gid)
-        yield transformed
+        #transformed = transform_schema(schema, gid)
+        #yield transformed
+        yield schema
 
 if __name__ == "__main__":
-    with open('transformed.json', 'w') as output:
+    with open('pre_transformed.json', 'w') as output:
         json.dump([i for i in load_annotations()], output)
