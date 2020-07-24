@@ -25,7 +25,7 @@ class DataverseUploader(biothings.hub.dataload.uploader.BaseSourceUploader):
                 },
             "code": {
                 "branch": "master",
-                "repo": "https://github.com/juliamullen/dataverses"
+                "repo": "https://github.com/outbreak-info/dataverses"
                 },
             "url": "https://dataverse.org/",
             "license": "https://dataverse.org/best-practices/harvard-dataverse-general-terms-use",
