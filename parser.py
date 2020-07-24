@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import json
 
 from datetime    import date
@@ -6,13 +8,38 @@ from html.parser import HTMLParser
 
 try:
     from biothings import config
-    logging = config.logger
+    logger = config.logger
 except ImportError:
     import logging
-    logging.basicConfig(filename="dataverselog.log", level=logging.INFO)
+    logger = logging.getLogger('dataverse')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.FileHandler('dataverse_log.log')
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
-QUERIES = ["2019-nCoV", "COVID-19", "COVID-19 virus", "COVID19", "COVID19 virus", "HCoV-19", "HCoV19", "Human coronavirus 19", "Human coronavirus 2019", "SARS-2", "SARS-CoV-2", "SARS-CoV2", "SARS2", "SARSCoV-2", "SARSCoV2",
-                 "Severe acute respiratory syndrome coronavirus 2", "Wuhan coronavirus", "Wuhan seafood market pneumonia virus", "coronavirus disease", "coronavirus disease 19", "coronavirus disease 2019", "novel coronavirus", "novel coronavirus 2019"]
+def requests_retry_session(retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 504), session=None):
+    """
+    request backoff + retry helper
+    https://www.peterbe.com/plog/best-practice-with-retries-with-requests
+    """
+
+    session = session or requests.Session()
+    retry = Retry(
+            total=retries,
+            read=retries,
+            connect=retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
+            )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+ 
+QUERIES = ["2019-nCoV", "COVID-19", "COVID19", "SARS-2", "SARS-CoV-2", "SARS2", "coronavirus disease", "novel coronavirus"]
+TIMEOUT = 120
+
 DATAVERSE_SERVER = "https://dataverse.harvard.edu/api/"
 EXPORT_URL = f"{DATAVERSE_SERVER}datasets/export?exporter=schema.org"
 
@@ -32,7 +59,10 @@ def compile_query(server, queries=None, response_types=None, subtrees=None):
 
     if queries:
         # turn ["a", "b"] into '"a"+"b"'
-        query_string = "+".join(f"\"{q}\"" for q in queries)
+        if type(queries) == str:
+            query_string = f"\"{queries}\""
+        else:
+            query_string = "+".join(f"\"{q}\"" for q in queries)
 
     if response_types:
         type_string = "".join(f"&type={r}" for r in response_types)
@@ -42,7 +72,7 @@ def compile_query(server, queries=None, response_types=None, subtrees=None):
 
     return f"{server}search?q={query_string}{type_string}{subtree_string}"
 
-def compile_paginated_data(query_endpoint, per_page=100):
+def compile_paginated_data(query_endpoint, per_page=1000):
     """
     pages through data, compiling all response['data']['items']
     and returning them.
@@ -55,12 +85,16 @@ def compile_paginated_data(query_endpoint, per_page=100):
 
     while continue_paging:
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
-        logging.info(f"getting {url}")
-        req = requests.get(url)
+        logger.info(f"getting {url}")
+        try:
+            req = requests_retry_session().get(url, timeout=TIMEOUT)
+        except Exception as requestException:
+            logger.error(f"Failed to get {url} due to {requestException}")
+            continue
         try:
             response = req.json()
         except ValueError:
-            logging.error(f"Failed to get a JSON response from {url}")
+            logger.error(f"Failed to get a JSON response from {url}")
         total = response.get('data').get('total_count')
         data.extend(response.get('data').get('items'))
         start += per_page
@@ -93,10 +127,10 @@ def find_within_dataverse(dataverse_id, query):
     return datasets_and_files
 
 def get_all_datasets_from_dataverses():
-    logging.info("finding all dataverses that match for queries")
+    logger.info("finding all dataverses that match for queries")
     dataverses = find_relevant_dataverses(QUERIES)
 
-    logging.info("grabbing datasets from each matched dataverse")
+    logger.info("grabbing datasets from each matched dataverse")
     datasets = []
     for dataverse in dataverses:
         datasets.extend(find_within_dataverse(dataverse, query=None))
@@ -109,7 +143,7 @@ def scrape_schema_representation(url):
     this will grab it from the url
     by looking for <script type="application/ld+json">
     """
-    logging.warning(f"scraping schema.org representation from the dataset url {url}")
+    logger.warning(f"scraping schema.org representation from the dataset url {url}")
     class SchemaScraper(HTMLParser):
         def __init__(self):
             super().__init__()
@@ -125,9 +159,13 @@ def scrape_schema_representation(url):
                 self.schema = data
                 self.readingSchema = False
 
-    req = requests.get(url)
+    try:
+        req = requests_retry_session().get(url, timeout=TIMEOUT)
+    except Exception as requestException:
+        logger.error(f"Failed to get {url} due to {requestException}")
+        return False
     if not req.ok:
-        logging.error(f"failed to get {url}")
+        logger.error(f"failed to get {url}")
         return False
     parser = SchemaScraper()
     parser.feed(req.text)
@@ -143,9 +181,20 @@ def fetch_datasets():
     returns a dictionary mapping global_id -> dataset
     """
 
-    logging.info("getting all datasets that match queries")
-    dataset_endpoint = compile_query(DATAVERSE_SERVER, QUERIES, response_types=["dataset", "file"])
-    datasets = compile_paginated_data(dataset_endpoint)
+    logger.info("getting all datasets that match queries")
+
+    dataset_ids = set([None])
+    datasets    = []
+    T = []
+
+    for query in QUERIES:
+        dataset_endpoint = compile_query(DATAVERSE_SERVER, query, response_types=["dataset", "file"])
+        new_datasets        = compile_paginated_data(dataset_endpoint)
+        unique_new_datasets = [i for i in new_datasets if i.get('global_id') not in dataset_ids]
+        datasets.extend(unique_new_datasets)
+
+        # union-equals instead of += for sets
+        dataset_ids        |= set([i.get('global_id') for i in unique_new_datasets])
 
     data_for_gid = {d.get('global_id'): d for d in datasets}
     schema_org_exports = {}
@@ -166,14 +215,18 @@ def fetch_datasets():
     return total_datasets
 
 
-def get_schema(gid, backup_url):
+def get_schema(gid, url):
     schema_export_url = f"{EXPORT_URL}&persistentId={gid}"
-    logging.info(f"getting schema {schema_export_url}")
-    req = requests.get(schema_export_url)
+    logger.info(f"getting schema {url}")
+    try:
+        req = requests_retry_session().get(schema_export_url, timeout=TIMEOUT)
+    except Exception as requestException:
+        logger.error(f"Failed to get {url} due to {requestException}")
+        return False
     res = req.json()
     if res.get('status') and res.get('status') == 'ERROR':
-        logging.warning("schema export failed, scraping instead")
-        schema = scrape_schema_representation(backup_url)
+        logger.warning("schema export failed, scraping instead")
+        schema = scrape_schema_representation(url)
         if schema:
             return schema
     else:
