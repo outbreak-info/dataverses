@@ -24,4 +24,4 @@ class DataverseDumper(biothings.hub.dataload.dumper.DummyDumper):
         }
     }
 
-    SCHEDULE = "40 1 * * *"
+    SCHEDULE = "40 6 * * *"
