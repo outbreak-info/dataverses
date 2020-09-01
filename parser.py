@@ -38,7 +38,7 @@ def requests_retry_session(retries=3, backoff_factor=0.3, status_forcelist=(500,
     return session
  
 QUERIES = ["2019-nCoV", "COVID-19", "COVID19", "SARS-2", "SARS-CoV-2", "SARS2", "coronavirus disease", "novel coronavirus"]
-TIMEOUT = 120
+TIMEOUT = 300
 
 DATAVERSE_SERVER = "https://dataverse.harvard.edu/api/"
 EXPORT_URL = f"{DATAVERSE_SERVER}datasets/export?exporter=schema.org"
@@ -80,8 +80,9 @@ def compile_paginated_data(query_endpoint, per_page=1000):
     """
 
     continue_paging = True
-    start = 0
-    data = []
+    start   = 0
+    data    = []
+    retries = 0
 
     while continue_paging:
         url = f"{query_endpoint}&per_page={per_page}&start={start}"
@@ -90,6 +91,12 @@ def compile_paginated_data(query_endpoint, per_page=1000):
             req = requests_retry_session().get(url, timeout=TIMEOUT)
         except Exception as requestException:
             logger.error(f"Failed to get {url} due to {requestException}")
+            if retries > 5:
+                logger.error("Failed too many times")
+                return data
+            retries += 1
+            # after 1 retry, limit per-page to 200, after 2, limit to 50
+            per_page = 200 if retries == 1 else 50
             continue
         try:
             response = req.json()
@@ -185,10 +192,9 @@ def fetch_datasets():
 
     dataset_ids = set([None])
     datasets    = []
-    T = []
 
     for query in QUERIES:
-        dataset_endpoint = compile_query(DATAVERSE_SERVER, query, response_types=["dataset", "file"])
+        dataset_endpoint    = compile_query(DATAVERSE_SERVER, query, response_types=["dataset", "file"])
         new_datasets        = compile_paginated_data(dataset_endpoint)
         unique_new_datasets = [i for i in new_datasets if i.get('global_id') not in dataset_ids]
         datasets.extend(unique_new_datasets)
