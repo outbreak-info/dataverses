@@ -5,6 +5,8 @@ biothings.config_for_app(config)
 
 import biothings.hub.dataload.dumper
 
+import datetime
+
 class DataverseDumper(biothings.hub.dataload.dumper.DummyDumper):
     SRC_NAME = "dataverses"
     SRC_ROOT_FOLDER = os.path.join(config.DATA_ARCHIVE_ROOT, SRC_NAME)
@@ -25,3 +27,10 @@ class DataverseDumper(biothings.hub.dataload.dumper.DummyDumper):
     }
 
     SCHEDULE = "40 6 * * *"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_release()
+
+    def set_release(self):
+        self.release = datetime.datetime.now().strftime('%Y-%m-%d-%H:%M')
