@@ -229,7 +229,10 @@ def get_schema(gid, url):
     except Exception as requestException:
         logger.error(f"Failed to get {url} due to {requestException}")
         return False
-    res = req.json()
+    try:
+        res = req.json()
+    except json.decoder.JSONDecodeError:
+        return False
     if res.get('status') and res.get('status') == 'ERROR':
         logger.warning("schema export failed, scraping instead")
         schema = scrape_schema_representation(url)
