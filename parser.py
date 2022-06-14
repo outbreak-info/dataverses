@@ -238,7 +238,7 @@ def transform_document(document, gid):
     elif type(document['license']) is dict:
         license = document['license'].get('url')
 
-    pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'version', '@type']
+    pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', '@type']
 
     resource = {
         "@type": "Dataset",
