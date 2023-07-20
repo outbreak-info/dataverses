@@ -26,8 +26,8 @@ class DataverseDumper(biothings.hub.dataload.dumper.DummyDumper):
         }
     }
 
-    SCHEDULE = "40 6 * * *"
-    
+    # SCHEDULE = "40 6 * * *"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.set_release()

@@ -100,12 +100,13 @@ def compile_paginated_data(query_endpoint, per_page=1000):
             continue
         try:
             response = req.json()
+            total = response.get('data').get('total_count')
+            data.extend(response.get('data').get('items'))
+            start += per_page
+            continue_paging = total and start < total
         except ValueError:
             logger.error(f"Failed to get a JSON response from {url}")
-        total = response.get('data').get('total_count')
-        data.extend(response.get('data').get('items'))
-        start += per_page
-        continue_paging = total and start < total
+            continue_paging = False
 
     return data
 
@@ -262,7 +263,11 @@ def transform_schema(s, gid):
     }
     authors = [personify(author) for author in s['author']]
     creator = [personify(creator) for creator in s['creator']]
-    license = s['license'].get('url')
+    license = s['license']
+    try:
+        license = license.get('url')
+    except AttributeError:
+        pass
 
     pass_through_fields = ['name', 'dateModified', 'datePublished', 'keywords', 'distribution', '@id', 'funder', 'identifier', 'version', '@type']
 
